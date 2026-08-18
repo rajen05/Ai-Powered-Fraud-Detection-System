@@ -17,6 +17,7 @@ import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 
+
 st.set_page_config(page_title="Credit Card Fraud Detector", page_icon="💳", layout="wide")
 
 MODEL_PATH = "models/fraud_model.pkl"
@@ -57,7 +58,7 @@ with tab_predict:
     except FileNotFoundError:
         st.error(
             "No trained model found at `models/fraud_model.pkl`. "
-            "Run `python src/train.py` first (see STEPS.md)."
+            "Run `python src/train.py` first."
         )
         st.stop()
 
@@ -65,11 +66,25 @@ with tab_predict:
 
     st.subheader("Enter transaction details")
 
-    col_a, col_b = st.columns([1, 2])
-    with col_a:
-        if df_sample is not None and st.button("🎲 Load a random transaction"):
-            row = df_sample.sample(1).iloc[0]
-            st.session_state["prefill"] = row.to_dict()
+    if df_sample is not None:
+        col_a, col_b, _ = st.columns([1, 1, 2])
+        with col_a:
+            if st.button("🎲 Load random transaction"):
+                row = df_sample.sample(1).iloc[0]
+                st.session_state["prefill"] = row.to_dict()
+                st.session_state["prefill_label"] = "legit" if row["Class"] == 0 else "fraud"
+        with col_b:
+            fraud_rows = df_sample[df_sample["Class"] == 1]
+            if st.button("🚨 Load a real fraud case"):
+                row = fraud_rows.sample(1).iloc[0]
+                st.session_state["prefill"] = row.to_dict()
+                st.session_state["prefill_label"] = "fraud"
+
+        label = st.session_state.get("prefill_label")
+        if label == "fraud":
+            st.warning("⚠️ This transaction is a **real fraud case** from the dataset — see if the model catches it.")
+        elif label == "legit":
+            st.info("ℹ️ This is a **legitimate transaction** from the dataset.")
 
     prefill = st.session_state.get("prefill", {})
 
@@ -106,11 +121,15 @@ with tab_predict:
     threshold = st.slider(
         "Decision threshold (probability above this = flagged as fraud)",
         min_value=0.0, max_value=1.0, value=0.5, step=0.01,
-        help=(
-            "Lower threshold = catches more fraud but more false alarms "
-            "(higher recall, lower precision). Higher threshold = fewer false "
-            "alarms but more fraud slips through (higher precision, lower recall)."
-        ),
+    )
+
+    st.caption(
+        f"**How the threshold works:** The model outputs a fraud probability for every transaction. "
+        f"If that probability is above **{threshold:.0%}**, the transaction gets flagged. "
+        f"Right now you need more than {threshold:.0%} confidence to trigger an alert. "
+        f"Drag left → catches more fraud but also more innocent transactions get flagged (false alarms). "
+        f"Drag right → fewer false alarms but some real fraud slips through undetected. "
+        f"In a real bank, this number is set based on business cost — missing fraud is usually more expensive than a false alarm."
     )
 
     if submitted:
@@ -122,7 +141,7 @@ with tab_predict:
         input_df = input_df[col_order]
 
         proba = model.predict_proba(input_df)[0, 1]
-        flagged = proba >= threshold
+        flagged = proba > threshold
 
         st.divider()
         col1, col2 = st.columns(2)

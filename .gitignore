@@ -1,0 +1,22 @@
+# Dataset — too large for git (download from Kaggle)
+data/creditcard.csv
+
+# Raw screen recording — commit demo.gif instead
+*.mov
+
+# Trained model files
+models/*.pkl
+
+# Jupyter auto-save backups
+.ipynb_checkpoints/
+
+# Python virtual environment
+venv/
+
+# macOS junk
+.DS_Store
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo

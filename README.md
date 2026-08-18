@@ -1,94 +1,89 @@
-# 💳 Credit Card Fraud Detection
+# Credit Card Fraud Detection
 
-A machine learning project that detects fraudulent credit card transactions
-in a highly imbalanced dataset (0.17% fraud), with a deployed interactive
-Streamlit app for live predictions.
+Built a machine learning pipeline to detect fraudulent credit card transactions from a heavily imbalanced dataset — only 0.17% of transactions are actual fraud.
 
-**🔗 Live demo:** _add your Streamlit Cloud link here after deploying_
+**Live demo:** _coming soon_
 
-![Class distribution](models/class_distribution.png)
+![App demo](demo.gif)
 
-## Problem
+---
 
-Detect fraudulent transactions from ~285,000 anonymized European credit
-card transactions, where only 492 (0.17%) are fraud. The severe imbalance
-means naive accuracy is meaningless — a model that always predicts "not
-fraud" scores 99.83% accuracy while catching nothing.
+## The problem
 
-## Dataset
+The dataset has 284,807 transactions, of which only 492 are fraud. That imbalance is the entire challenge. A model that just guesses "not fraud" every single time would be 99.83% accurate — and completely useless. So raw accuracy means nothing here. I focused on PR-AUC and recall instead.
 
-[Credit Card Fraud Detection (ULB)](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud)
-on Kaggle — 284,807 transactions from European cardholders over two days.
-Features `V1`–`V28` are PCA-anonymized (standard practice for real
-financial data); `Time` and `Amount` are the only interpretable raw features.
+The features are mostly anonymized (V1–V28 are PCA components — standard practice in financial data to protect cardholder privacy). The only raw features are `Amount` and `Time`.
 
-## Approach
+Dataset: [Credit Card Fraud Detection on Kaggle (ULB)](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud)
 
-1. **EDA** — class imbalance, amount distribution, feature correlation with fraud
-2. **Preprocessing** — scaled `Amount`/`Time`, stratified train/test split
-3. **Imbalance handling** — compared two strategies:
-   - Class weighting (`class_weight='balanced'`)
-   - SMOTE oversampling (training set only — never applied to test data)
-4. **Models compared** — Logistic Regression (baseline), Random Forest, XGBoost
-5. **Evaluation** — Precision, Recall, F1, ROC-AUC, and **PR-AUC** (the most
-   informative metric on this imbalanced dataset)
+---
+
+## What I did
+
+- Explored the data: class imbalance, transaction amount distribution, which features correlate most strongly with fraud
+- Scaled `Amount` and `Time`, then did a stratified train/test split so fraud cases are evenly distributed
+- Used SMOTE to oversample fraud cases in the **training set only** — applying it before splitting would leak synthetic fraud into the test set, which inflates scores unfairly
+- Trained three models and compared them: Logistic Regression (baseline), Random Forest, XGBoost
+- Picked the winner based on PR-AUC, which is the most informative metric on imbalanced data
+
+---
 
 ## Results
 
 | Model | Precision | Recall | F1 | PR-AUC |
 |---|---|---|---|---|
-| Logistic Regression | _fill in_ | _fill in_ | _fill in_ | _fill in_ |
-| Random Forest | _fill in_ | _fill in_ | _fill in_ | _fill in_ |
-| XGBoost | _fill in_ | _fill in_ | _fill in_ | _fill in_ |
-| XGBoost + SMOTE | _fill in_ | _fill in_ | _fill in_ | _fill in_ |
+| Logistic Regression | 0.06 | 0.92 | 0.11 | 0.72 |
+| Random Forest | 0.96 | 0.76 | 0.85 | 0.86 |
+| **XGBoost** | **0.87** | **0.85** | **0.86** | **0.88** |
 
-_(Fill this in after running the notebook — see `STEPS.md`.)_
+XGBoost won. It catches 85% of actual fraud cases while keeping false alarms low. Logistic Regression catches more fraud (92% recall) but flags way too many legit transactions — in practice that'd be thousands of unnecessary card declines per day. Random Forest is precise but misses too much fraud. XGBoost hits the right balance.
 
-**Key decision:** in fraud detection, a missed fraud case (false negative)
-is usually more costly than a false alarm (false positive), so the final
-model was selected with a lean toward higher recall rather than raw accuracy.
+In fraud detection, missing a real fraud case is generally worse than a false alarm, so I'd lean the threshold slightly toward recall in production — the app lets you see this tradeoff live.
 
-## Try it
+---
 
-The Streamlit app lets you:
-- Enter transaction values manually or load a random real transaction
-- See the fraud probability and an adjustable decision threshold, so you
-  can see the precision/recall tradeoff in real time
-- View the EDA charts and explanation of why accuracy is misleading here
+## The app
 
-## Run locally
+Built a Streamlit app to make the model actually usable:
+
+- Load a random real transaction from the dataset and run it through the model
+- See the fraud probability score
+- Adjust the decision threshold with a slider and watch how precision/recall shift in real time
+
+To run it locally:
 
 ```bash
 git clone <your-repo-url>
 cd fraud-detection
+
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 
-# Download creditcard.csv from Kaggle into data/
-
-python src/train.py          # trains models, saves the best one
-streamlit run app.py         # launches the app at localhost:8501
+# put creditcard.csv in data/ (download from Kaggle link above)
+python src/train.py       # trains models, saves the best one
+streamlit run app.py      # opens at localhost:8501
 ```
 
-Full beginner-friendly walkthrough: see [`STEPS.md`](STEPS.md).
+---
 
 ## Project structure
 
 ```
-fraud-detection/
-├── data/                   # creditcard.csv goes here (not in git — see .gitignore)
+├── data/                   # creditcard.csv goes here (not committed — too large)
 ├── notebooks/
 │   └── 01_eda_and_modeling.ipynb
 ├── src/
-│   ├── preprocess.py       # loading, scaling, splitting, SMOTE
-│   ├── train.py            # trains and compares 3 models
-│   └── evaluate.py         # precision/recall/F1/PR-AUC evaluation
-├── models/                 # saved model + charts (generated, not in git)
+│   ├── preprocess.py       # data loading, scaling, train/test split, SMOTE
+│   ├── train.py            # trains all 3 models, picks the best, saves it
+│   └── evaluate.py         # scoring: precision, recall, F1, PR-AUC
+├── models/                 # saved model file + charts (auto-generated)
 ├── app.py                  # Streamlit app
-├── requirements.txt
-└── STEPS.md                # full beginner walkthrough
+└── requirements.txt
 ```
 
-## Stretch goals (not yet implemented)
+---
 
-- SHAP values in the app to explain individual predictions ("why was this flagged?")
-- Threshold-tuning visualization built directly into the notebook
+## What I'd improve
+
+The most obvious next step is adding SHAP explanations — right now the app tells you *that* a transaction is suspicious but not *why*. SHAP would surface which features pushed the score up, which is actually useful in a real fraud review workflow. I'd also try threshold-tuning directly in the notebook rather than just in the app.
